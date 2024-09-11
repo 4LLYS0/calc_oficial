@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciar Dependências</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row border-bottom m-3 p-1 shadow">
+            <div class="col"><h2 class="mb-4">Gerenciar Dependências</h2></div>
+            <div class="col"><button class="btn btn-outline-success mb-3" onclick="javascript:history.back();">Voltar</button></div>
+        </div>
+
+        <!-- Seção para buscar dependências por unidade consumidora -->
+        <section class="m-4">
+            <div class="row">
+                <div class="col-6">
+                    <h4>Selecione a Unidade Consumidora</h4>
+                    <select id="unidadeConsumidoraSelect" class="form-control mb-3"></select>
+                    <button class="btn btn-outline-success" onclick="fetchDependencias()">Buscar Dependências</button>
+                    <button class="btn btn-outline-primary" onclick="showAddDependenciaForm()">Adicionar Dependência</button>
+                </div>
+            </div>
+
+            <!-- Exibir a listagem de dependências -->
+            <div id="dependenciasList" class="mt-4"></div>
+        </section>
+
+        <!-- Formulário para adicionar ou editar dependência -->
+        <section id="dependenciaForm" class="d-none">
+            <h2 id="formTitle">Cadastrar Nova Dependência</h2>
+            <form id="dependenciaFormElement">
+                <input type="hidden" id="dependenciaId">
+                <div class="mb-3">
+                    <label for="dependenciaNome" class="form-label">Nome</label>
+                    <input type="text" class="form-control" id="dependenciaNome" required>
+                </div>
+                <div class="mb-3">
+                    <label for="dependenciaUnidadeConsumidora" class="form-label">Unidade Consumidora</label>
+                    <select class="form-control" id="dependenciaUnidadeConsumidora" required></select>
+                </div>
+                <button type="submit" class="btn btn-primary">Salvar</button>
+            </form>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchUnidadesConsumidorasSelect(); // Preenche o select das unidades consumidoras
+            document.getElementById('dependenciaFormElement').addEventListener('submit', function (event) {
+                event.preventDefault();
+                saveDependencia();
+            });
+        });
+
+        function fetchUnidadesConsumidorasSelect() {
+            fetch('http://localhost:8000/unidades-consumidoras')
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    const unidadeConsumidoraSelect = document.getElementById('unidadeConsumidoraSelect');
+                    const dependenciaUnidadeConsumidoraSelect = document.getElementById('dependenciaUnidadeConsumidora');
+                    unidadeConsumidoraSelect.innerHTML = '';
+                    dependenciaUnidadeConsumidoraSelect.innerHTML = '';
+                    data.unidades_consumidoras.forEach(unidade => {
+                        const option = document.createElement('option');
+                        option.value = unidade.id;
+                        option.text = `${unidade.nome} (ID: ${unidade.id})`;
+                        unidadeConsumidoraSelect.appendChild(option);
+                        dependenciaUnidadeConsumidoraSelect.appendChild(option.cloneNode(true));
+                    });
+                })
+                .catch(error => console.error('Erro ao buscar unidades consumidoras:', error));
+        }
+
+        function fetchDependencias() {
+            const unidadeConsumidoraId = document.getElementById('unidadeConsumidoraSelect').value;
+            fetch(`http://localhost:8000/dependencias/unidade-consumidora/${unidadeConsumidoraId}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    const dependenciasList = document.getElementById('dependenciasList');
+                    dependenciasList.innerHTML = '<ul class="list-group">';
+                    data.dependencias.forEach(dependencia => {
+                        dependenciasList.innerHTML += `
+<li class="list-group-item">
+<strong>Nome:</strong> ${dependencia.nome} <br>
+<strong>ID:</strong> ${dependencia.id} <br>
+<button class="btn btn-info btn-sm mt-2" onclick="showEditDependenciaForm(${dependencia.id}, '${dependencia.nome}', ${dependencia.unidade_consumidora_id})">Editar</button>
+<button class="btn btn-danger btn-sm mt-2" onclick="deleteDependencia(${dependencia.id})">Deletar</button>
+</li>`;
+                    });
+                    dependenciasList.innerHTML += '</ul>';
+                })
+                .catch(error => console.error('Erro ao buscar dependências:', error));
+        }
+
+        function showAddDependenciaForm() {
+            document.getElementById('dependenciaForm').classList.remove('d-none');
+            document.getElementById('formTitle').innerText = 'Adicionar Nova Dependência';
+            document.getElementById('dependenciaId').value = '';
+            document.getElementById('dependenciaNome').value = '';
+            document.getElementById('dependenciaUnidadeConsumidora').value = '';
+        }
+
+        function showEditDependenciaForm(id, nome, unidadeConsumidoraId) {
+            document.getElementById('dependenciaForm').classList.remove('d-none');
+            document.getElementById('formTitle').innerText = 'Editar Dependência';
+            document.getElementById('dependenciaId').value = id;
+            document.getElementById('dependenciaNome').value = nome;
+            document.getElementById('dependenciaUnidadeConsumidora').value = unidadeConsumidoraId;
+        }
+
+        function saveDependencia() {
+            const id = document.getElementById('dependenciaId').value;
+            const nome = document.getElementById('dependenciaNome').value;
+            const unidade_consumidora_id = document.getElementById('dependenciaUnidadeConsumidora').value;
+            
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `http://localhost:8000/dependencias/${id}` : 'http://localhost:8000/dependencias';
+
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ nome, unidade_consumidora_id })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data)
+                fetchDependencias();
+                document.getElementById('dependenciaForm').classList.add('d-none');
+            })
+            .catch(error => console.error('Erro ao salvar dependência:', error));
+        }
+
+        function deleteDependencia(id) {
+            fetch(`http://localhost:8000/dependencias/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data)
+                fetchDependencias();
+            })
+            .catch(error => console.error('Erro ao deletar dependência:', error));
+        }
+    </script>
+</body>
+</html>
